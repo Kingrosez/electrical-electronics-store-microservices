@@ -6,14 +6,21 @@ import com.eande.store.user_service.dto.response.AuthResponse;
 import com.eande.store.user_service.dto.response.UserResponse;
 import com.eande.store.user_service.enums.Role;
 import com.eande.store.user_service.enums.Status;
+import com.eande.store.user_service.mapper.UserMapper;
+import com.eande.store.user_service.repository.UserRepository;
 import com.eande.store.user_service.service.UserService;
+import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
-
+@Service
+@AllArgsConstructor
 public class UserServiceImpl implements UserService {
+    private final UserRepository userRepository;
+    private final UserMapper userMapper;
     @Override
     public UserResponse registerUser(RegisterRequest request) {
         return null;
