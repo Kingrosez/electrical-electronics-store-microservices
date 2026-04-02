@@ -31,13 +31,13 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
     }
 
-    @PostMapping("/bulk-register")
-    public ResponseEntity<BulkRegistrationResponse> registerUsersBulk( @RequestBody List<@Valid RegisterRequest> requests) {
-        log.info("Received request to register {} users", requests.size());
-        BulkRegistrationResponse response = userService.registerUsersBulk(requests);
-        log.info("Bulk registration completed: {} successful, {} failed out of {} total",
-                response.successfulRegistrations(), response.failedRegistrations(), response.totalProcessed());
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
+//    @PostMapping("/bulk-register")
+//    public ResponseEntity<BulkRegistrationResponse> registerUsersBulk( @RequestBody List<@Valid RegisterRequest> requests) {
+//        log.info("Received request to register {} users", requests.size());
+//        BulkRegistrationResponse response = userService.registerUsersBulk(requests);
+//        log.info("Bulk registration completed: {} successful, {} failed out of {} total",
+//                response.successfulRegistrations(), response.failedRegistrations(), response.totalProcessed());
+//        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+//    }
 
 }
