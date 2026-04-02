@@ -4,26 +4,34 @@ import com.eande.store.user_service.dto.request.*;
 import com.eande.store.user_service.dto.response.AddressResponse;
 import com.eande.store.user_service.dto.response.AuthResponse;
 import com.eande.store.user_service.dto.response.UserResponse;
+import com.eande.store.user_service.entity.User;
 import com.eande.store.user_service.enums.Role;
 import com.eande.store.user_service.enums.Status;
+import com.eande.store.user_service.exception.EmailAlreadyExistsException;
+import com.eande.store.user_service.exception.PhoneNumberAlreadyExistsException;
 import com.eande.store.user_service.mapper.UserMapper;
 import com.eande.store.user_service.repository.UserRepository;
 import com.eande.store.user_service.service.UserService;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 @Service
 @AllArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
+
     @Override
     public UserResponse registerUser(RegisterRequest request) {
-        return null;
+        return registerUserInternally(request);
     }
 
     @Override
@@ -149,5 +157,26 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse updateUserStatus(UUID userId, UpdateStatusRequest request) {
         return null;
+    }
+
+    UserResponse registerUserInternally(RegisterRequest request) {
+        log.info("Registering user with email: {}", request.email());
+        if (userRepository.existsByEmail(request.email())) {
+            log.warn("Registration failed: Email {} already exists", request.email());
+            throw new EmailAlreadyExistsException("Email already in use");
+        }
+        if ( request.phone() != null && !request.phone().isBlank() && userRepository.existsByPhone(request.phone())) {
+            log.warn("Registration failed: Phone number {} already exists", request.phone());
+            throw new PhoneNumberAlreadyExistsException("Phone number already in use");
+        }
+        User user = userMapper.toEntity(request);
+        user.setStatus(Status.ACTIVE);
+        user.setRole(Role.USER);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        User saved = userRepository.save(user);
+        log.info("Successfully registered user with email: {}", request.email());
+        return userMapper.toResponse(saved);
+
+
     }
 }
