@@ -1,6 +1,8 @@
 name: User Service CI
+
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # future-proof (fix warning)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches:
@@ -26,9 +28,12 @@ jobs:
           cache: maven
 
       - name: Build & Test (JaCoCo included)
-        run: mvn clean verify
+        working-directory: user-service
+        run: mvn clean verify -Dspring.profiles.active=test
+
 
       - name: SonarCloud Scan
+        working-directory: user-service
         run: mvn sonar:sonar \
           -Dsonar.projectKey=electrical-electronics-store-user-service \
           -Dsonar.organization=kingrosez \
