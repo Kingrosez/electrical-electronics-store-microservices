@@ -7,8 +7,7 @@ import com.eande.store.user_service.dto.response.UserResponse;
 import com.eande.store.user_service.entity.User;
 import com.eande.store.user_service.enums.Role;
 import com.eande.store.user_service.enums.Status;
-import com.eande.store.user_service.exception.EmailAlreadyExistsException;
-import com.eande.store.user_service.exception.PhoneNumberAlreadyExistsException;
+import com.eande.store.user_service.exception.ResourceAlreadyExistsException;
 import com.eande.store.user_service.mapper.UserMapper;
 import com.eande.store.user_service.repository.UserRepository;
 import com.eande.store.user_service.service.UserService;
@@ -163,11 +162,11 @@ public class UserServiceImpl implements UserService {
         log.info("Registering user with email: {}", request.email());
         if (userRepository.existsByEmail(request.email())) {
             log.warn("Registration failed: Email {} already exists", request.email());
-            throw new EmailAlreadyExistsException("Email already in use");
+            throw new ResourceAlreadyExistsException("Email already in use");
         }
         if ( request.phone() != null && !request.phone().isBlank() && userRepository.existsByPhone(request.phone())) {
             log.warn("Registration failed: Phone number {} already exists", request.phone());
-            throw new PhoneNumberAlreadyExistsException("Phone number already in use");
+            throw new ResourceAlreadyExistsException("Phone number already in use");
         }
         User user = userMapper.toEntity(request);
         user.setStatus(Status.ACTIVE);

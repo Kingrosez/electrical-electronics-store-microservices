@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
         List<FieldError> fieldErrors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(err-> new FieldError(err.getField(), err.getDefaultMessage()))
+                .map(err -> new FieldError(err.getField(), err.getDefaultMessage()))
                 .toList();
         return responseBuilder(
                 HttpStatus.BAD_REQUEST,
@@ -48,12 +48,24 @@ public class GlobalExceptionHandler {
     //Generic Exception
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
-            Exception ex,
             HttpServletRequest request
     ) {
         return responseBuilder(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred",
+                request,
+                null
+        );
+    }
+
+    @ExceptionHandler(ResourceAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleResourceAlreadyExistsException(
+            ResourceAlreadyExistsException ex,
+            HttpServletRequest request
+    ) {
+        return responseBuilder(
+                HttpStatus.CONFLICT,
+                ex.getMessage(),
                 request,
                 null
         );
