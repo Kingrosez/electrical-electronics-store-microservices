@@ -1,40 +1,41 @@
-#-------------------------------------------------------------------------------#
-#            Discover all capabilities of Qodana in our documentation           #
-#             https://www.jetbrains.com/help/qodana/about-qodana.html           #
-#-------------------------------------------------------------------------------#
-
-name: Qodana
-on:
-  workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
-      - user-service
-
-jobs:
-  qodana:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      checks: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2026.1
-        env:
-          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
-        with:
-          # When pr-mode is set to true, Qodana analyzes only the files that have been changed
-          pr-mode: false
-          use-caches: true
-          post-pr-comment: true
-          use-annotations: true
-          # Upload Qodana results (SARIF, other artifacts, logs) as an artifact to the job
-          upload-result: false
-          # quick-fixes available in Ultimate and Ultimate Plus plans
-          push-fixes: 'none'
+$path='.github/workflows/qodana_code_quality.yml'; $i=0; Get-Content $path | ForEach-Object { $i++; "${i}: $_" }
+1: #-------------------------------------------------------------------------------#
+2: #            Discover all capabilities of Qodana in our documentation           #
+3: #             https://www.jetbrains.com/help/qodana/about-qodana.html           #
+4: #-------------------------------------------------------------------------------#
+5: 
+6: name: Qodana
+7: on:
+8:   workflow_dispatch:
+9:   pull_request:
+10:   push:
+11:     branches:
+12:       - main
+13:       - user-service
+14: 
+15: jobs:
+16:   qodana:
+17:     runs-on: ubuntu-latest
+18:     permissions:
+19:       contents: write
+20:       pull-requests: write
+21:       checks: write
+22:     steps:
+23:       - uses: actions/checkout@v4
+24:         with:
+25:           ref: ${{ github.event.pull_request.head.sha }}
+26:           fetch-depth: 0
+27:       - name: 'Qodana Scan'
+28:         uses: JetBrains/qodana-action@v2026.1
+29:         env:
+30:           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+31:         with:
+32:           # When pr-mode is set to true, Qodana analyzes only the files that have been changed
+33:           pr-mode: false
+34:           use-caches: true
+35:           post-pr-comment: true
+36:           use-annotations: true
+37:           # Upload Qodana results (SARIF, other artifacts, logs) as an artifact to the job
+38:           upload-result: false
+39:           # quick-fixes available in Ultimate and Ultimate Plus plans
+40:           push-fixes: 'none'
