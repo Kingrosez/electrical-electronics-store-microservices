@@ -1,6 +1,7 @@
 package com.eande.store.user_service.controller;
 
 import com.eande.store.user_service.dto.request.RegisterRequest;
+import com.eande.store.user_service.dto.response.BulkRegistrationResponse;
 import com.eande.store.user_service.dto.response.UserResponse;
 import com.eande.store.user_service.exception.GlobalExceptionHandler;
 import com.eande.store.user_service.exception.ResourceAlreadyExistsException;
@@ -17,8 +18,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+import java.util.UUID;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -278,6 +284,116 @@ public class UserControllerUintTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("An unexpected error occurred"));
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturn201_whenAllRequestsAreValid() throws Exception {
+        RegisterRequest firstRequest = RegisterRequestBuilder.builder()
+                .withEmail("bulk-one@gmail.com")
+                .withPhone("1111111111")
+                .build();
+        RegisterRequest secondRequest = RegisterRequestBuilder.builder()
+                .withEmail("bulk-two@gmail.com")
+                .withPhone("2222222222")
+                .build();
+
+        BulkRegistrationResponse response = new BulkRegistrationResponse(
+                2,
+                2,
+                0,
+                List.of(
+                        new UserResponse(UUID.randomUUID(), firstRequest.name(), firstRequest.email(), firstRequest.phone(), "USER", "ACTIVE", null),
+                        new UserResponse(UUID.randomUUID(), secondRequest.name(), secondRequest.email(), secondRequest.phone(), "USER", "ACTIVE", null)
+                ),
+                List.of()
+        );
+
+        when(userService.registerUsersBulk(anyList())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(firstRequest, secondRequest))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalProcessed").value(2))
+                .andExpect(jsonPath("$.successfulRegistrations").value(2))
+                .andExpect(jsonPath("$.failedRegistrations").value(0))
+                .andExpect(jsonPath("$.successDetails", hasSize(2)))
+                .andExpect(jsonPath("$.successDetails[0].email").value(firstRequest.email()))
+                .andExpect(jsonPath("$.successDetails[1].email").value(secondRequest.email()));
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturn201_withFailureDetailsWhenServiceCapturesPartialFailures() throws Exception {
+        RegisterRequest successRequest = RegisterRequestBuilder.builder()
+                .withEmail("ok@gmail.com")
+                .withPhone("3333333333")
+                .build();
+        RegisterRequest failedRequest = RegisterRequestBuilder.builder()
+                .withEmail("duplicate@gmail.com")
+                .withPhone("4444444444")
+                .build();
+
+        BulkRegistrationResponse response = new BulkRegistrationResponse(
+                2,
+                1,
+                1,
+                List.of(new UserResponse(UUID.randomUUID(), successRequest.name(), successRequest.email(), successRequest.phone(), "USER", "ACTIVE", null)),
+                List.of(new BulkRegistrationResponse.FailedRegistration(failedRequest, "Email already in use"))
+        );
+
+        when(userService.registerUsersBulk(anyList())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(successRequest, failedRequest))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalProcessed").value(2))
+                .andExpect(jsonPath("$.successfulRegistrations").value(1))
+                .andExpect(jsonPath("$.failedRegistrations").value(1))
+                .andExpect(jsonPath("$.failureDetails", hasSize(1)))
+                .andExpect(jsonPath("$.failureDetails[0].request.email").value(failedRequest.email()))
+                .andExpect(jsonPath("$.failureDetails[0].errorMessage").value("Email already in use"));
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturn400_whenAnyItemFailsValidation() throws Exception {
+        RegisterRequest validRequest = RegisterRequestBuilder.builder()
+                .withEmail("valid@gmail.com")
+                .withPhone("5555555555")
+                .build();
+        RegisterRequest invalidRequest = RegisterRequestBuilder.builder()
+                .withEmail("invalid-email")
+                .build();
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(validRequest, invalidRequest))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation Failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturn400_whenRequestBodyIsMalformed() throws Exception {
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[{]"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value("An unexpected error occurred"));
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturn201_whenRequestListIsEmpty() throws Exception {
+        BulkRegistrationResponse response = new BulkRegistrationResponse(0, 0, 0, List.of(), List.of());
+        when(userService.registerUsersBulk(anyList())).thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalProcessed").value(0))
+                .andExpect(jsonPath("$.successfulRegistrations").value(0))
+                .andExpect(jsonPath("$.failedRegistrations").value(0));
     }
 }
 

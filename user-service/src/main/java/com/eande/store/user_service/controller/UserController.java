@@ -3,16 +3,15 @@ package com.eande.store.user_service.controller;
 import com.eande.store.user_service.dto.request.RegisterRequest;
 import com.eande.store.user_service.dto.response.BulkRegistrationResponse;
 import com.eande.store.user_service.dto.response.UserResponse;
+import com.eande.store.user_service.exception.BadRequestException;
 import com.eande.store.user_service.service.UserService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -20,6 +19,10 @@ import java.util.List;
 @RequestMapping("/api/v1/users")
 @AllArgsConstructor
 @Slf4j
+@CrossOrigin(
+        origins = "http://localhost:5173",
+        allowCredentials = "true"
+)
 public class UserController {
     private final UserService userService;
 
@@ -31,13 +34,19 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(userResponse);
     }
 
-//    @PostMapping("/bulk-register")
-//    public ResponseEntity<BulkRegistrationResponse> registerUsersBulk( @RequestBody List<@Valid RegisterRequest> requests) {
-//        log.info("Received request to register {} users", requests.size());
-//        BulkRegistrationResponse response = userService.registerUsersBulk(requests);
-//        log.info("Bulk registration completed: {} successful, {} failed out of {} total",
-//                response.successfulRegistrations(), response.failedRegistrations(), response.totalProcessed());
-//        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-//    }
+    @PostMapping("/bulk-register")
+    public ResponseEntity<BulkRegistrationResponse> registerUsersBulk( @RequestBody @NotEmpty List<@Valid RegisterRequest> requests) {
+        log.info("Received request to register {} users", requests.size());
+        if (requests == null || requests.isEmpty()) {
+            throw new BadRequestException("Request list cannot be empty");
+        }
+        BulkRegistrationResponse response = userService.registerUsersBulk(requests);
+        log.info("Bulk registration completed: {} successful, {} failed out of {} total",
+                response.successfulRegistrations(), response.failedRegistrations(), response.totalProcessed());
+        if (response.failedRegistrations() == 0) {
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        }
+        return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
 
 }
