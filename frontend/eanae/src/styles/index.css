@@ -156,15 +156,25 @@ body{
     color: var(--primary-default);
 }
 
-/* Spacing System  */
+/* Spacing System and grid system */
 /* Layout container  */
 .container{
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
     padding-left: 16px;
     padding-right: 16px;
 }
 
+@media (min-width:640px) {
+    .container{
+        max-width: 640px;
+    }
+    
+}
 @media (min-width:768px) {
     .container{
+        max-width: 768px;
         padding-left: 24px;
         padding-right: 24px;
     }
@@ -172,10 +182,45 @@ body{
 
 @media (min-width:1024px) {
     .container{
+        max-width: 1024px;
         padding-left: 32px;
         padding-right: 32px;
     }
 }
+
+@media (min-width:1280px) {
+    .container{
+        max-width: 1280px;
+    }
+}
+
+/* card spacing  */
+.card-spacing{
+    padding: 16px;
+}
+.card-spacing-lg{
+    padding: 24px;
+}
+
+/* flex helpers */
+.flex-center{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.flex-between{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.flex-start{
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
 
 /* sections */
 .section{
@@ -213,7 +258,7 @@ body{
     margin-top: 24px;
 }
 
-/* grid gap helper */
+/* grid  helper */
 .grid-gap-sm {
     gap:8px;
 }
@@ -223,6 +268,42 @@ body{
 .grid-gap-lg {
     gap:24px;
 }
+
+.grid-2{
+    display:grid;
+    grid-template-columns: repeat(2,1fr);
+    gap: 16px;
+}
+.grid-3{
+    display:grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 16px;
+}
+.grid-4{
+    display:grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 16px;
+}
+
+/* Responsive grid  */
+.grid-responsive {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+@media (min-width:768px) {
+    .grid-responsive{
+        grid-template-columns: repeat(2,1fr);
+    }
+    
+}
+@media (min-width:768px) {
+    .grid-responsive{
+        grid-template-columns: repeat(4,1fr);
+    }
+    
+}
+
 
 /* Selection */
 ::selection{
@@ -234,4 +315,34 @@ body{
 :focus-visible{
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
+}
+
+/* shadow system  */
+:root{
+    --shadow-xs:0 1px 2px rgba(0,0,0,0.05);
+    --shadow-sm:0 1px 3px rgba(0,0,0,0.1);
+    --shadow-md:0 4px 6px rgba(0,0,0,0.1);
+    --shadow-lg:0 10px 15px rgba(0,0,0,0.15);
+    --shadow-xl:0 20px 25px rgba(0,0,0,0.2);
+}
+
+/* utility classes shadow  */
+.shadow-xs{
+    box-shadow: var(--shadow-xs);
+}
+
+.shadow-sm{
+    box-shadow: var(--shadow-sm);
+}
+
+.shadow-md{
+    box-shadow: var(--shadow-md);
+}
+
+.shadow-lg{
+    box-shadow: var(--shadow-lg);
+}
+
+.shadow-xl{
+    box-shadow: var(--shadow-xl);
 }
