@@ -1,1 +1,237 @@
 @import "tailwindcss";
+
+:root{
+    /* PRIMARY */
+    --primary-default:#2563EB;
+    --primary-hover:#1D4ED8;
+    --primary-light:#DBEAFE;
+
+    /* SECONDARY */
+    --secondary-default:#F59E0B;
+    --secondary-hover:#D97706;
+
+    /* NEUTRAL */
+   --neutral-bg: #FFFFFF;
+   --neutral-surface:#F9FAFB;
+   --neutral-border: #E5E7EB;
+   --neutral-divider: #E5E7EB;
+
+   --neutral-text-primary: #111827;
+   --neutral-text-secondary: #6B7280;
+   --neutral-text-disabled: #9CA3AF;
+   --neutral-text-disabled-bg: #F3F4F6;
+
+    /* STATE */
+   --state-success: #10B981;
+   --state-error: #EF4444;
+   --state-warning: #F59E0B;
+   --state-info: #3B82F6;
+
+    /* INTRACTION */
+    --interaction-hover-surface: #F3F4F6;
+    --interaction-active: rgba(37,99,235,0.12);
+    --interaction-overlay: rgba(0,0,0,0.5);
+
+    --focus-ring: rgba(37,99,235,0.2);
+    --selection-bg: rgba(37,99,235,0.1);
+
+    /* BADGE */
+   --badge-discount-bg: #FEE2E2;
+   --badge-discount-text: #B91C1C;
+
+   --badge-success-bg: #D1FAE5;
+   --badge-success-text: #065F46;
+
+   --badge-warning-bg: #FEF3C7;
+   --badge-warning-text: #92400E;
+
+   /* INPUT */
+  --input-bg: #FFFFFF;
+  --input-border-default: #E5E7EB;
+  --input-border-focus: #2563EB;
+  --input-border-error: #EF4444;
+
+   /* SKELETON */
+  --skeleton-base: #E5E7EB;
+  --skeleton-highlight:: #F3F4F6;
+
+   /* INVERSE */
+   --inverse-bg: #111827;
+   --inverse-text: #FFFFFF;
+
+   /* TEXT */
+   --text-link: #2563EB;
+}
+
+.dark{
+    --dark-bg: #0F172A;
+    --dark-surface: #1E293B;
+    --dark-border: #334155;
+
+    --dark-text-primary: #F1F5F9;
+    --dark-text-secondary: #94A3B8;
+}
+
+body{
+    background-color: var(--neutral-bg);
+    color: var(--neutral-text-primary);
+}
+
+/* Typography system */
+.text-h1{
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 40px;
+    color: var(--neutral-text-primary);
+}
+.text-h2{
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 32px;
+    color: var(--neutral-text-primary);
+}
+.text-h3{
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 28px;
+    color: var(--neutral-text-primary);
+}
+.text-h4{
+    font-size: 18px;
+    font-weight: 500;
+    line-height: 26px;
+    color: var(--neutral-text-primary);
+}
+.text-h5{
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    color: var(--neutral-text-primary);
+}
+.text-h6{
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--neutral-text-primary);
+}
+
+.text-body{
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 24px;
+    color: var(--neutral-text-primary);
+}
+
+.text-small{
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    color: var(--neutral-text-secondary);
+}
+
+.text-caption{
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 16px;
+    color: var(--neutral-text-secondary);
+}
+
+.text-button{
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+}
+
+.text-label{
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--neutral-text-primary);
+}
+
+.text-limk{
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--primary-default);
+}
+
+/* Spacing System  */
+/* Layout container  */
+.container{
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+@media (min-width:768px) {
+    .container{
+        padding-left: 24px;
+        padding-right: 24px;
+    }
+}
+
+@media (min-width:1024px) {
+    .container{
+        padding-left: 32px;
+        padding-right: 32px;
+    }
+}
+
+/* sections */
+.section{
+    padding-top: 48px;
+    padding-bottom: 48px;
+}
+.section-sm{
+    padding-top: 32px;
+    padding-bottom: 32px;
+}
+.section-lg{
+    padding-top: 64px;
+    padding-bottom: 64px;
+}
+
+/* stack (vertical spacing) */
+.stack-sm > * + * {
+    margin-top: 8px;
+}
+.stack-md > * + * {
+    margin-top: 16px;
+}
+.stack-lg > * + * {
+    margin-top: 24px;
+}
+
+/* inline (horizontal spacing) */
+.inline-sm > * + * {
+    margin-top: 8px;
+}
+.inline-md > * + * {
+    margin-top: 16px;
+}
+.inline-lg > * + * {
+    margin-top: 24px;
+}
+
+/* grid gap helper */
+.grid-gap-sm {
+    gap:8px;
+}
+.grid-gap-md {
+    gap:16px;
+}
+.grid-gap-lg {
+    gap:24px;
+}
+
+/* Selection */
+::selection{
+    background: var(--selection-bg);
+    font-family: Inter, Roboto, sans-serif;
+}
+
+/* Focus ring */
+:focus-visible{
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
