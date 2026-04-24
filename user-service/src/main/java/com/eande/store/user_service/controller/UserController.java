@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -47,6 +48,18 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         }
         return ResponseEntity.status(HttpStatus.OK).body(response);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<UserResponse> getUserById(@PathVariable("id") UUID userId) {
+
+        log.info("Fetching user with id: {}", userId);
+
+        UserResponse response = userService.getUserById(userId);
+
+        log.info("Successfully fetched user with id: {}", userId);
+
+        return ResponseEntity.ok(response);
     }
 
 }

@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -172,6 +173,33 @@ public class GlobalExceptionHandler {
         return responseBuilder(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "An unexpected error occurred",
+                request,
+                List.of()
+        );
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(
+            ResourceNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        return responseBuilder(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage(),
+                request,
+                List.of()
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request
+    ) {
+
+        return responseBuilder(
+                HttpStatus.BAD_REQUEST,
+                "Invalid UUID format",
                 request,
                 List.of()
         );

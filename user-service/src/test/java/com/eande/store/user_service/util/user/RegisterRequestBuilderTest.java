@@ -1,7 +1,8 @@
-package com.eande.store.user_service.util;
+package com.eande.store.user_service.util.user;
 
 
 import com.eande.store.user_service.dto.request.RegisterRequest;
+import com.eande.store.user_service.util.RegisterRequestBuilder;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

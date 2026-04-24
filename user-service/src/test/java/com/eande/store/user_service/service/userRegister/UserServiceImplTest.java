@@ -1,4 +1,4 @@
-package com.eande.store.user_service.service;
+package com.eande.store.user_service.service.userRegister;
 
 import com.eande.store.user_service.dto.request.RegisterRequest;
 import com.eande.store.user_service.dto.response.BulkRegistrationResponse;

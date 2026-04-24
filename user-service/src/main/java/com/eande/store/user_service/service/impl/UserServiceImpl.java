@@ -10,6 +10,7 @@ import com.eande.store.user_service.enums.Role;
 import com.eande.store.user_service.enums.Status;
 import com.eande.store.user_service.exception.BadRequestException;
 import com.eande.store.user_service.exception.ResourceAlreadyExistsException;
+import com.eande.store.user_service.exception.ResourceNotFoundException;
 import com.eande.store.user_service.mapper.UserMapper;
 import com.eande.store.user_service.repository.UserRepository;
 import com.eande.store.user_service.service.UserService;
@@ -77,7 +78,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserById(UUID userId) {
-        return null;
+        if (userId == null) {
+            throw new BadRequestException("User ID cannot be null");
+        }
+
+        User user = userRepository.findById(userId)
+                .filter(u -> !Boolean.TRUE.equals(u.getDeleted())) // soft delete check
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        return userMapper.toResponse(user);
     }
 
     @Override
