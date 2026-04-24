@@ -21,6 +21,7 @@ public class ApiResponse<T> {
     private Integer statusCode;
     private Instant timestamp;
     private String path;
+    private String requestId;  // Optional - add if you want
 
     public static <T> ApiResponse<T> success(T data) {
         return ApiResponse.<T>builder()

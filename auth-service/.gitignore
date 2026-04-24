@@ -31,3 +31,18 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Log files
+logs/
+*.log
+*.log.gz
+*.log.zip
+*.json.log
+
+# JaCoCo
+target/site/jacoco/
+.jacoco/
+
+# SonarQube
+.sonar/
+scanner-report/

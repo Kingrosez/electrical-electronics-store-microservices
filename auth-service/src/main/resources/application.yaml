@@ -2,167 +2,41 @@ spring:
   application:
     name: auth-service
   profiles:
-    active: dev
+    active: dev  # Default profile, overridden by SPRING_PROFILES_ACTIVE
 
----
-# DEV Profile
-spring:
-  config:
-    activate:
-      on-profile: dev
-  datasource:
-    url: jdbc:postgresql://localhost:5432/authdb
-    username: auth_user
-    password: auth_password
-    hikari:
-      maximum-pool-size: 5
-      minimum-idle: 2
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-
+# Common configuration across all profiles
 server:
-  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+  shutdown: graceful
 
-logging:
-  level:
-    com.eande.store.auth_service: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.cloud.openfeign: DEBUG
-
-jwt:
-  secret: ${JWT_SECRET:devSecretKey123456789012345678901234567890123456789012345678901234567890}
-  algorithm: HS512
-  access-token-expiration: 900
-  refresh-token-expiration: 604800
-
-auth:
-  max-failed-attempts: 5
-  account-lockout-duration-minutes: 15
-
-services:
-  user-service:
-    url: ${USER_SERVICE_URL:http://localhost:8081}
+springdoc:
+  api-docs:
+    path: /api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
 
 management:
   endpoints:
     web:
       exposure:
         include: health, info, metrics, prometheus
+      base-path: /actuator
   endpoint:
     health:
       show-details: when-authorized
-  prometheus:
     metrics:
-      export:
-        enabled: true
-
----
-# STAGING Profile
-spring:
-  config:
-    activate:
-      on-profile: staging
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/authdb}
-    username: ${DB_USER:auth_user}
-    password: ${DB_PASSWORD:change_me}
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-
-server:
-  port: 8080
-
-logging:
-  level:
-    com.eande.store.auth_service: INFO
-    org.springframework.security: WARN
-
-jwt:
-  secret: ${JWT_SECRET}
-  algorithm: HS512
-  access-token-expiration: 900
-  refresh-token-expiration: 604800
-
-auth:
-  max-failed-attempts: 5
-  account-lockout-duration-minutes: 15
-
-services:
-  user-service:
-    url: ${USER_SERVICE_URL}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health, info, metrics, prometheus
-
----
-# PRODUCTION Profile
-spring:
-  config:
-    activate:
-      on-profile: prod
-  datasource:
-    url: ${DB_URL}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
-    hikari:
-      maximum-pool-size: 50
-      minimum-idle: 10
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-  flyway:
-    enabled: true
-    baseline-on-migrate: false
-
-server:
-  port: 8080
-  tomcat:
-    accesslog:
       enabled: true
-      directory: /var/log/tomcat
-
-logging:
-  level:
-    com.eande.store.auth_service: WARN
-  file:
-    name: /var/log/auth-service/application.log
-
-jwt:
-  secret: ${JWT_SECRET}
-  algorithm: HS512
-  access-token-expiration: 900
-  refresh-token-expiration: 604800
-
-auth:
-  max-failed-attempts: 5
-  account-lockout-duration-minutes: 15
-
-services:
-  user-service:
-    url: ${USER_SERVICE_URL}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health, info, metrics, prometheus
+    prometheus:
+      enabled: true
+  info:
+    env:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}

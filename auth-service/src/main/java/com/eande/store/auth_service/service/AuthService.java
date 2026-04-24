@@ -8,6 +8,9 @@ import com.eande.store.auth_service.dto.request.RefreshTokenRequest;
 import com.eande.store.auth_service.dto.response.TokenResponse;
 import com.eande.store.auth_service.entity.LoginAttempt;
 import com.eande.store.auth_service.entity.RefreshToken;
+import com.eande.store.auth_service.exception.*;
+import com.eande.store.auth_service.mapper.LoginAttemptMapper;
+import com.eande.store.auth_service.mapper.RefreshTokenMapper;
 import com.eande.store.auth_service.repository.LoginAttemptRepository;
 import com.eande.store.auth_service.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,10 @@ public class AuthService {
     private final LoginAttemptRepository loginAttemptRepository;
     private final JwtService jwtService;
 
+    // Mappers
+    private final RefreshTokenMapper refreshTokenMapper;
+    private final LoginAttemptMapper loginAttemptMapper;
+
     @Value("${auth.max-failed-attempts:5}")
     private int maxFailedAttempts;
 
@@ -50,20 +57,26 @@ public class AuthService {
         UserDto user = userServiceClient.findByEmail(request.getEmail())
                 .orElseThrow(() -> {
                     log.warn("Login failed - user not found: {}", request.getEmail());
-                    recordFailedAttempt(request.getEmail(), ipAddress, "USER_NOT_FOUND");
-                    return new RuntimeException("Invalid email or password");
+                    saveFailedAttempt(request.getEmail(), ipAddress, "USER_NOT_FOUND");
+                    return AuthenticationException.invalidCredentials();
                 });
 
-        // Check if account is locked
+        // Check if account is blocked
         if ("BLOCKED".equals(user.getStatus())) {
             log.warn("Login failed - account blocked for user: {}", user.getEmail());
-            throw new RuntimeException("Account is blocked. Contact support.");
+            throw AuthenticationException.accountLocked();
         }
 
         // Check if account is inactive
         if (!user.isEnabled()) {
             log.warn("Login failed - account inactive for user: {}", user.getEmail());
-            throw new RuntimeException("Account is not active. Please verify your email.");
+            throw AuthenticationException.accountInactive();
+        }
+
+        // Check if account is deleted
+        if (user.isDeleted()) {
+            log.warn("Login failed - account deleted for user: {}", user.getEmail());
+            throw AuthenticationException.accountDeleted();
         }
 
         // Verify password using User Service validation
@@ -74,13 +87,12 @@ public class AuthService {
         if (!validationResponse.isValid()) {
             log.warn("Login failed - invalid password for user: {}", user.getId());
             handleFailedPassword(user, ipAddress);
-            recordFailedAttempt(request.getEmail(), ipAddress, "INVALID_PASSWORD");
-            throw new RuntimeException("Invalid email or password");
+            saveFailedAttempt(request.getEmail(), ipAddress, "INVALID_PASSWORD");
+            throw AuthenticationException.invalidCredentials();
         }
 
-        // Success - reset failed attempts
-        resetFailedLoginAttempts(user.getEmail());
-        recordSuccessfulLogin(user, ipAddress, userAgent);
+        // Success - save successful attempt
+        saveSuccessfulAttempt(user.getEmail(), ipAddress);
 
         // Generate tokens
         String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
@@ -109,17 +121,31 @@ public class AuthService {
         // Validate token structure
         if (!jwtService.isTokenValid(refreshTokenString)) {
             log.warn("Invalid refresh token structure");
-            throw new RuntimeException("Invalid refresh token");
+            throw TokenException.invalidToken();
         }
 
         // Check token type
-        String tokenType = jwtService.extractTokenType(refreshTokenString);
-        if (!"refresh".equals(tokenType)) {
-            log.warn("Token type mismatch - expected refresh, got: {}", tokenType);
-            throw new RuntimeException("Invalid token type");
+        String tokenType;
+        try {
+            tokenType = jwtService.extractTokenType(refreshTokenString);
+        } catch (Exception e) {
+            log.warn("Failed to extract token type");
+            throw TokenException.invalidToken();
         }
 
-        String userIdStr = jwtService.extractUserId(refreshTokenString);
+        if (!"refresh".equals(tokenType)) {
+            log.warn("Token type mismatch - expected refresh, got: {}", tokenType);
+            throw TokenException.wrongTokenType();
+        }
+
+        String userIdStr;
+        try {
+            userIdStr = jwtService.extractUserId(refreshTokenString);
+        } catch (Exception e) {
+            log.warn("Failed to extract user ID from token");
+            throw TokenException.invalidToken();
+        }
+
         UUID userId = UUID.fromString(userIdStr);
 
         // Find stored refresh token
@@ -127,27 +153,27 @@ public class AuthService {
                 .findByTokenAndRevokedFalse(refreshTokenString)
                 .orElseThrow(() -> {
                     log.warn("Refresh token not found or revoked for user: {}", userId);
-                    return new RuntimeException("Refresh token has been revoked");
+                    return TokenException.refreshTokenRevoked();
                 });
 
         // Check expiry
         if (storedToken.getExpiryDate().isBefore(Instant.now())) {
             log.warn("Refresh token expired for user: {}", userId);
             refreshTokenRepository.revokeByToken(refreshTokenString);
-            throw new RuntimeException("Refresh token has expired. Please login again.");
+            throw TokenException.refreshTokenExpired();
         }
 
         // Fetch user from User Service
         UserDto user = userServiceClient.findById(userId)
                 .orElseThrow(() -> {
                     log.warn("User not found during refresh: {}", userId);
-                    return new RuntimeException("User not found");
+                    return ResourceNotFoundException.userNotFoundById(userId.toString());
                 });
 
         // Check if user is still active
         if (!user.isEnabled() || user.isDeleted()) {
             log.warn("User is no longer active during refresh: {}", userId);
-            throw new RuntimeException("Account is no longer active");
+            throw AuthenticationException.accountInactive();
         }
 
         // Revoke old token (token rotation)
@@ -225,19 +251,19 @@ public class AuthService {
     }
 
     /**
-     * Generate and store refresh token
+     * Generate and store refresh token using mapper
      */
     private String generateAndStoreRefreshToken(UserDto user, String ipAddress, String userAgent) {
         String refreshTokenString = jwtService.generateRefreshToken(user.getId());
 
-        RefreshToken refreshToken = RefreshToken.builder()
-                .token(refreshTokenString)
-                .userId(user.getId())
-                .ipAddress(ipAddress)
-                .userAgent(userAgent)
-                .expiryDate(Instant.now().plusSeconds(jwtService.getRefreshTokenExpirationSeconds()))
-                .revoked(false)
-                .build();
+        // Using mapper to create RefreshToken entity
+        RefreshToken refreshToken = refreshTokenMapper.createRefreshToken(
+                user.getId(),
+                refreshTokenString,
+                ipAddress,
+                userAgent,
+                jwtService.getRefreshTokenExpirationSeconds()
+        );
 
         refreshTokenRepository.save(refreshToken);
 
@@ -252,22 +278,24 @@ public class AuthService {
         long failedAttempts = loginAttemptRepository.countFailedAttemptsSince(email, since);
 
         if (failedAttempts >= maxFailedAttempts) {
-            log.warn("Account locked due to too many failed attempts: {}", email);
-            throw new RuntimeException("Too many failed attempts. Please try again later.");
+            log.warn("Rate limit exceeded for email: {}", email);
+            throw RateLimitException.tooManyLoginAttempts(lockoutDurationMinutes * 60L);
         }
     }
 
     /**
-     * Record failed login attempt
+     * Save failed login attempt using mapper
      */
-    private void recordFailedAttempt(String email, String ipAddress, String reason) {
-        LoginAttempt attempt = LoginAttempt.builder()
-                .email(email)
-                .ipAddress(ipAddress)
-                .success(false)
-                .failureReason(reason)
-                .build();
+    private void saveFailedAttempt(String email, String ipAddress, String reason) {
+        LoginAttempt attempt = loginAttemptMapper.toFailedAttempt(email, ipAddress, reason);
+        loginAttemptRepository.save(attempt);
+    }
 
+    /**
+     * Save successful login attempt using mapper
+     */
+    private void saveSuccessfulAttempt(String email, String ipAddress) {
+        LoginAttempt attempt = loginAttemptMapper.toSuccessfulAttempt(email, ipAddress);
         loginAttemptRepository.save(attempt);
     }
 
@@ -275,28 +303,6 @@ public class AuthService {
      * Handle failed password attempt
      */
     private void handleFailedPassword(UserDto user, String ipAddress) {
-        recordFailedAttempt(user.getEmail(), ipAddress, "INVALID_PASSWORD");
-        // Could implement account locking after too many attempts here
-    }
-
-    /**
-     * Reset failed login attempts
-     */
-    private void resetFailedLoginAttempts(String email) {
-        log.debug("Failed login attempts reset for: {}", email);
-    }
-
-    /**
-     * Record successful login
-     */
-    private void recordSuccessfulLogin(UserDto user, String ipAddress, String userAgent) {
-        LoginAttempt attempt = LoginAttempt.builder()
-                .email(user.getEmail())
-                .ipAddress(ipAddress)
-                .success(true)
-                .failureReason(null)
-                .build();
-
-        loginAttemptRepository.save(attempt);
+        saveFailedAttempt(user.getEmail(), ipAddress, "INVALID_PASSWORD");
     }
 }

@@ -1,0 +1,180 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: AuthServiceHikariPool-Prod
+      leak-detection-threshold: 30000
+      validation-timeout: 5000
+      register-mbeans: true
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          batch_size: 30
+          batch_versioned_data: true
+        order_inserts: true
+        order_updates: true
+        query:
+          in_clause_parameter_padding: true
+        cache:
+          use_second_level_cache: true
+          use_query_cache: false
+          region:
+            factory_class: org.hibernate.cache.jcache.JCacheRegionFactory
+    open-in-view: false
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    clean-disabled: true
+    clean-on-validation-error: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      timeout: 2000ms
+      ssl: true
+      client-name: auth-service-prod
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 20
+          min-idle: 10
+          max-wait: -1ms
+        shutdown-timeout: 200ms
+
+server:
+  port: 8080
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 20
+    accesslog:
+      enabled: true
+      directory: /var/log/tomcat
+      pattern: common
+      prefix: access_log
+      suffix: .log
+      rotate: true
+      rename-on-rotate: true
+      request-attributes-enabled: true
+    connection-timeout: 20000ms
+    max-connections: 1000
+    accept-count: 100
+    compression: on
+    compressable-mime-types: text/html,text/xml,text/plain,application/json
+
+logging:
+  level:
+    root: WARN
+    com.eande.store.auth_service: INFO
+    org.springframework: WARN
+    org.springframework.security: ERROR
+    org.hibernate: ERROR
+  file:
+    path: /var/log/auth-service
+    name: /var/log/auth-service/${spring.application.name}.log
+    max-size: 100MB
+    max-history: 30
+    total-size-cap: 2GB
+  pattern:
+    file: "%d{ISO8601} | %-5level | [%thread] | %logger{36} | %msg%n"
+  logback:
+    rollingpolicy:
+      max-history: 30
+      max-file-size: 100MB
+      total-size-cap: 2GB
+      clean-history-on-start: false
+
+jwt:
+  secret: ${JWT_SECRET}
+  algorithm: HS512
+  access-token-expiration: 900
+  refresh-token-expiration: 604800
+
+auth:
+  max-failed-attempts: 5
+  account-lockout-duration-minutes: 15
+  allowed-origins: ${ALLOWED_ORIGINS}
+
+services:
+  user-service:
+    url: ${USER_SERVICE_URL}
+    connection-timeout: 5000
+    read-timeout: 10000
+    max-attempts: 2
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      userService:
+        register-health-indicator: true
+        sliding-window-size: 50
+        minimum-number-of-calls: 20
+        permitted-number-of-calls-in-half-open-state: 10
+        wait-duration-in-open-state: 30s
+        failure-rate-threshold: 60
+        slow-call-rate-threshold: 50
+        slow-call-duration-threshold: 2s
+  retry:
+    instances:
+      userService:
+        max-attempts: 2
+        wait-duration: 2s
+        retry-exceptions:
+          - feign.RetryableException
+          - java.net.SocketTimeoutException
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: never
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+      sla:
+        http:
+          server:
+            requests: 10ms, 50ms, 100ms, 200ms, 500ms
+
+info:
+  app:
+    name: ${spring.application.name}
+    version: ${project.version}
+    description: Authentication Service
+    environment: production
