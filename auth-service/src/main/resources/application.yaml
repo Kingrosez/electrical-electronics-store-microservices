@@ -1,6 +1,6 @@
 spring:
   application:
-    name: electro-shop
+    name: auth-service
   profiles:
     active: dev
 
@@ -11,9 +11,9 @@ spring:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/electrodb
-    username: electro_user
-    password: dev_password_only
+    url: jdbc:postgresql://localhost:5432/authdb
+    username: auth_user
+    password: auth_password
     hikari:
       maximum-pool-size: 5
       minimum-idle: 2
@@ -27,18 +27,15 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-  docker:
-    compose:
-      enabled: true
-      lifecycle-management: start_and_stop
 
 server:
   port: 8080
 
 logging:
   level:
-    com.electro: DEBUG
+    com.eande.store.auth_service: DEBUG
     org.springframework.security: DEBUG
+    org.springframework.cloud.openfeign: DEBUG
 
 jwt:
   secret: ${JWT_SECRET:devSecretKey123456789012345678901234567890123456789012345678901234567890}
@@ -49,6 +46,10 @@ jwt:
 auth:
   max-failed-attempts: 5
   account-lockout-duration-minutes: 15
+
+services:
+  user-service:
+    url: ${USER_SERVICE_URL:http://localhost:8081}
 
 management:
   endpoints:
@@ -70,8 +71,8 @@ spring:
     activate:
       on-profile: staging
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/electrodb}
-    username: ${DB_USER:electro_user}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/authdb}
+    username: ${DB_USER:auth_user}
     password: ${DB_PASSWORD:change_me}
     hikari:
       maximum-pool-size: 20
@@ -86,17 +87,10 @@ spring:
 
 server:
   port: 8080
-  tomcat:
-    threads:
-      max: 100
-      min-spare: 10
-    accesslog:
-      enabled: true
-      directory: /var/log/tomcat
 
 logging:
   level:
-    com.electro: INFO
+    com.eande.store.auth_service: INFO
     org.springframework.security: WARN
 
 jwt:
@@ -108,6 +102,16 @@ jwt:
 auth:
   max-failed-attempts: 5
   account-lockout-duration-minutes: 15
+
+services:
+  user-service:
+    url: ${USER_SERVICE_URL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
 
 ---
 # PRODUCTION Profile
@@ -122,17 +126,10 @@ spring:
     hikari:
       maximum-pool-size: 50
       minimum-idle: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
   jpa:
     hibernate:
       ddl-auto: validate
     show-sql: false
-    properties:
-      hibernate:
-        jdbc:
-          batch_size: 20
   flyway:
     enabled: true
     baseline-on-migrate: false
@@ -140,36 +137,15 @@ spring:
 server:
   port: 8080
   tomcat:
-    threads:
-      max: 200
-      min-spare: 20
     accesslog:
       enabled: true
       directory: /var/log/tomcat
-      pattern: common
-      rotate: true
 
 logging:
   level:
-    com.electro: WARN
-    org.springframework: WARN
-  pattern:
-    file: "%d{ISO8601} [%thread] %-5level %logger{36} - %msg%n"
+    com.eande.store.auth_service: WARN
   file:
-    name: /var/log/electro-shop/application.log
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health, info, metrics, prometheus
-  endpoint:
-    health:
-      show-details: never
-  prometheus:
-    metrics:
-      export:
-        enabled: true
+    name: /var/log/auth-service/application.log
 
 jwt:
   secret: ${JWT_SECRET}
@@ -180,3 +156,13 @@ jwt:
 auth:
   max-failed-attempts: 5
   account-lockout-duration-minutes: 15
+
+services:
+  user-service:
+    url: ${USER_SERVICE_URL}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
