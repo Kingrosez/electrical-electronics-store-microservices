@@ -9,6 +9,8 @@ import com.eande.store.auth_service.dto.response.TokenResponse;
 import com.eande.store.auth_service.entity.LoginAttempt;
 import com.eande.store.auth_service.entity.RefreshToken;
 import com.eande.store.auth_service.exception.*;
+import com.eande.store.auth_service.mapper.LoginAttemptMapper;
+import com.eande.store.auth_service.mapper.RefreshTokenMapper;
 import com.eande.store.auth_service.repository.LoginAttemptRepository;
 import com.eande.store.auth_service.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,10 @@ public class AuthService {
     private final LoginAttemptRepository loginAttemptRepository;
     private final JwtService jwtService;
 
+    // Mappers
+    private final RefreshTokenMapper refreshTokenMapper;
+    private final LoginAttemptMapper loginAttemptMapper;
+
     @Value("${auth.max-failed-attempts:5}")
     private int maxFailedAttempts;
 
@@ -51,7 +57,7 @@ public class AuthService {
         UserDto user = userServiceClient.findByEmail(request.getEmail())
                 .orElseThrow(() -> {
                     log.warn("Login failed - user not found: {}", request.getEmail());
-                    recordFailedAttempt(request.getEmail(), ipAddress, "USER_NOT_FOUND");
+                    saveFailedAttempt(request.getEmail(), ipAddress, "USER_NOT_FOUND");
                     return AuthenticationException.invalidCredentials();
                 });
 
@@ -81,13 +87,12 @@ public class AuthService {
         if (!validationResponse.isValid()) {
             log.warn("Login failed - invalid password for user: {}", user.getId());
             handleFailedPassword(user, ipAddress);
-            recordFailedAttempt(request.getEmail(), ipAddress, "INVALID_PASSWORD");
+            saveFailedAttempt(request.getEmail(), ipAddress, "INVALID_PASSWORD");
             throw AuthenticationException.invalidCredentials();
         }
 
-        // Success - reset failed attempts
-        resetFailedLoginAttempts(user.getEmail());
-        recordSuccessfulLogin(user, ipAddress, userAgent);
+        // Success - save successful attempt
+        saveSuccessfulAttempt(user.getEmail(), ipAddress);
 
         // Generate tokens
         String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
@@ -246,19 +251,19 @@ public class AuthService {
     }
 
     /**
-     * Generate and store refresh token
+     * Generate and store refresh token using mapper
      */
     private String generateAndStoreRefreshToken(UserDto user, String ipAddress, String userAgent) {
         String refreshTokenString = jwtService.generateRefreshToken(user.getId());
 
-        RefreshToken refreshToken = RefreshToken.builder()
-                .token(refreshTokenString)
-                .userId(user.getId())
-                .ipAddress(ipAddress)
-                .userAgent(userAgent)
-                .expiryDate(Instant.now().plusSeconds(jwtService.getRefreshTokenExpirationSeconds()))
-                .revoked(false)
-                .build();
+        // Using mapper to create RefreshToken entity
+        RefreshToken refreshToken = refreshTokenMapper.createRefreshToken(
+                user.getId(),
+                refreshTokenString,
+                ipAddress,
+                userAgent,
+                jwtService.getRefreshTokenExpirationSeconds()
+        );
 
         refreshTokenRepository.save(refreshToken);
 
@@ -279,16 +284,18 @@ public class AuthService {
     }
 
     /**
-     * Record failed login attempt
+     * Save failed login attempt using mapper
      */
-    private void recordFailedAttempt(String email, String ipAddress, String reason) {
-        LoginAttempt attempt = LoginAttempt.builder()
-                .email(email)
-                .ipAddress(ipAddress)
-                .success(false)
-                .failureReason(reason)
-                .build();
+    private void saveFailedAttempt(String email, String ipAddress, String reason) {
+        LoginAttempt attempt = loginAttemptMapper.toFailedAttempt(email, ipAddress, reason);
+        loginAttemptRepository.save(attempt);
+    }
 
+    /**
+     * Save successful login attempt using mapper
+     */
+    private void saveSuccessfulAttempt(String email, String ipAddress) {
+        LoginAttempt attempt = loginAttemptMapper.toSuccessfulAttempt(email, ipAddress);
         loginAttemptRepository.save(attempt);
     }
 
@@ -296,27 +303,6 @@ public class AuthService {
      * Handle failed password attempt
      */
     private void handleFailedPassword(UserDto user, String ipAddress) {
-        recordFailedAttempt(user.getEmail(), ipAddress, "INVALID_PASSWORD");
-    }
-
-    /**
-     * Reset failed login attempts
-     */
-    private void resetFailedLoginAttempts(String email) {
-        log.debug("Failed login attempts reset for: {}", email);
-    }
-
-    /**
-     * Record successful login
-     */
-    private void recordSuccessfulLogin(UserDto user, String ipAddress, String userAgent) {
-        LoginAttempt attempt = LoginAttempt.builder()
-                .email(user.getEmail())
-                .ipAddress(ipAddress)
-                .success(true)
-                .failureReason(null)
-                .build();
-
-        loginAttemptRepository.save(attempt);
+        saveFailedAttempt(user.getEmail(), ipAddress, "INVALID_PASSWORD");
     }
 }
