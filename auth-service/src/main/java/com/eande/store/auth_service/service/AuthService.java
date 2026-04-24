@@ -8,6 +8,7 @@ import com.eande.store.auth_service.dto.request.RefreshTokenRequest;
 import com.eande.store.auth_service.dto.response.TokenResponse;
 import com.eande.store.auth_service.entity.LoginAttempt;
 import com.eande.store.auth_service.entity.RefreshToken;
+import com.eande.store.auth_service.exception.*;
 import com.eande.store.auth_service.repository.LoginAttemptRepository;
 import com.eande.store.auth_service.repository.RefreshTokenRepository;
 import lombok.RequiredArgsConstructor;
@@ -51,19 +52,25 @@ public class AuthService {
                 .orElseThrow(() -> {
                     log.warn("Login failed - user not found: {}", request.getEmail());
                     recordFailedAttempt(request.getEmail(), ipAddress, "USER_NOT_FOUND");
-                    return new RuntimeException("Invalid email or password");
+                    return AuthenticationException.invalidCredentials();
                 });
 
-        // Check if account is locked
+        // Check if account is blocked
         if ("BLOCKED".equals(user.getStatus())) {
             log.warn("Login failed - account blocked for user: {}", user.getEmail());
-            throw new RuntimeException("Account is blocked. Contact support.");
+            throw AuthenticationException.accountLocked();
         }
 
         // Check if account is inactive
         if (!user.isEnabled()) {
             log.warn("Login failed - account inactive for user: {}", user.getEmail());
-            throw new RuntimeException("Account is not active. Please verify your email.");
+            throw AuthenticationException.accountInactive();
+        }
+
+        // Check if account is deleted
+        if (user.isDeleted()) {
+            log.warn("Login failed - account deleted for user: {}", user.getEmail());
+            throw AuthenticationException.accountDeleted();
         }
 
         // Verify password using User Service validation
@@ -75,7 +82,7 @@ public class AuthService {
             log.warn("Login failed - invalid password for user: {}", user.getId());
             handleFailedPassword(user, ipAddress);
             recordFailedAttempt(request.getEmail(), ipAddress, "INVALID_PASSWORD");
-            throw new RuntimeException("Invalid email or password");
+            throw AuthenticationException.invalidCredentials();
         }
 
         // Success - reset failed attempts
@@ -109,17 +116,31 @@ public class AuthService {
         // Validate token structure
         if (!jwtService.isTokenValid(refreshTokenString)) {
             log.warn("Invalid refresh token structure");
-            throw new RuntimeException("Invalid refresh token");
+            throw TokenException.invalidToken();
         }
 
         // Check token type
-        String tokenType = jwtService.extractTokenType(refreshTokenString);
-        if (!"refresh".equals(tokenType)) {
-            log.warn("Token type mismatch - expected refresh, got: {}", tokenType);
-            throw new RuntimeException("Invalid token type");
+        String tokenType;
+        try {
+            tokenType = jwtService.extractTokenType(refreshTokenString);
+        } catch (Exception e) {
+            log.warn("Failed to extract token type");
+            throw TokenException.invalidToken();
         }
 
-        String userIdStr = jwtService.extractUserId(refreshTokenString);
+        if (!"refresh".equals(tokenType)) {
+            log.warn("Token type mismatch - expected refresh, got: {}", tokenType);
+            throw TokenException.wrongTokenType();
+        }
+
+        String userIdStr;
+        try {
+            userIdStr = jwtService.extractUserId(refreshTokenString);
+        } catch (Exception e) {
+            log.warn("Failed to extract user ID from token");
+            throw TokenException.invalidToken();
+        }
+
         UUID userId = UUID.fromString(userIdStr);
 
         // Find stored refresh token
@@ -127,27 +148,27 @@ public class AuthService {
                 .findByTokenAndRevokedFalse(refreshTokenString)
                 .orElseThrow(() -> {
                     log.warn("Refresh token not found or revoked for user: {}", userId);
-                    return new RuntimeException("Refresh token has been revoked");
+                    return TokenException.refreshTokenRevoked();
                 });
 
         // Check expiry
         if (storedToken.getExpiryDate().isBefore(Instant.now())) {
             log.warn("Refresh token expired for user: {}", userId);
             refreshTokenRepository.revokeByToken(refreshTokenString);
-            throw new RuntimeException("Refresh token has expired. Please login again.");
+            throw TokenException.refreshTokenExpired();
         }
 
         // Fetch user from User Service
         UserDto user = userServiceClient.findById(userId)
                 .orElseThrow(() -> {
                     log.warn("User not found during refresh: {}", userId);
-                    return new RuntimeException("User not found");
+                    return ResourceNotFoundException.userNotFoundById(userId.toString());
                 });
 
         // Check if user is still active
         if (!user.isEnabled() || user.isDeleted()) {
             log.warn("User is no longer active during refresh: {}", userId);
-            throw new RuntimeException("Account is no longer active");
+            throw AuthenticationException.accountInactive();
         }
 
         // Revoke old token (token rotation)
@@ -252,8 +273,8 @@ public class AuthService {
         long failedAttempts = loginAttemptRepository.countFailedAttemptsSince(email, since);
 
         if (failedAttempts >= maxFailedAttempts) {
-            log.warn("Account locked due to too many failed attempts: {}", email);
-            throw new RuntimeException("Too many failed attempts. Please try again later.");
+            log.warn("Rate limit exceeded for email: {}", email);
+            throw RateLimitException.tooManyLoginAttempts(lockoutDurationMinutes * 60L);
         }
     }
 
@@ -276,7 +297,6 @@ public class AuthService {
      */
     private void handleFailedPassword(UserDto user, String ipAddress) {
         recordFailedAttempt(user.getEmail(), ipAddress, "INVALID_PASSWORD");
-        // Could implement account locking after too many attempts here
     }
 
     /**

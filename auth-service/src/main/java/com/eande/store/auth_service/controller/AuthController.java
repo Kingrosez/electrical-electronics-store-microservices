@@ -25,7 +25,6 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
 
-        // FIXED: Use .getEmail() instead of .email()
         log.info("Login request received for email: {}", request.getEmail());
 
         String ipAddress = getClientIp(httpRequest);
