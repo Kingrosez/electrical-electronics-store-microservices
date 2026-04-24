@@ -29,7 +29,7 @@ public class TestDataFactory {
                 "johndoe@gmail.com",
                 "1234567890",
                 null,
-                null,
+                "ACTIVE",
                 null
                 );
     }

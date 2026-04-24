@@ -3,11 +3,14 @@ package com.eande.store.user_service.service.impl;
 import com.eande.store.user_service.dto.request.*;
 import com.eande.store.user_service.dto.response.AddressResponse;
 import com.eande.store.user_service.dto.response.AuthResponse;
+import com.eande.store.user_service.dto.response.BulkRegistrationResponse;
 import com.eande.store.user_service.dto.response.UserResponse;
 import com.eande.store.user_service.entity.User;
 import com.eande.store.user_service.enums.Role;
 import com.eande.store.user_service.enums.Status;
+import com.eande.store.user_service.exception.BadRequestException;
 import com.eande.store.user_service.exception.ResourceAlreadyExistsException;
+import com.eande.store.user_service.exception.ResourceNotFoundException;
 import com.eande.store.user_service.mapper.UserMapper;
 import com.eande.store.user_service.repository.UserRepository;
 import com.eande.store.user_service.service.UserService;
@@ -20,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.ArrayList;
 @Service
 @AllArgsConstructor
 @Slf4j
@@ -34,8 +38,32 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public List<UserResponse> registerUsersBulk(List<RegisterRequest> requests) {
-        return List.of();
+    public BulkRegistrationResponse registerUsersBulk(List<RegisterRequest> requests) {
+
+
+        if (requests == null || requests.isEmpty()) {
+            throw new BadRequestException("User list cannot be null or empty");
+        }
+        log.info("Registering {} users in bulk", requests.size());
+        List<UserResponse> successDetails = new ArrayList<>();
+        List<BulkRegistrationResponse.FailedRegistration> failureDetails = new ArrayList<>();
+
+        for (RegisterRequest request : requests) {
+            try {
+                successDetails.add(registerUserInternally(request));
+            } catch (RuntimeException ex) {
+                log.warn("Bulk registration failed for email {}: {}", request.email(), ex.getMessage());
+                failureDetails.add(new BulkRegistrationResponse.FailedRegistration(request, ex.getMessage()));
+            }
+        }
+
+        return new BulkRegistrationResponse(
+                requests.size(),
+                successDetails.size(),
+                failureDetails.size(),
+                successDetails,
+                failureDetails
+        );
     }
 
     @Override
@@ -50,7 +78,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse getUserById(UUID userId) {
-        return null;
+        if (userId == null) {
+            throw new BadRequestException("User ID cannot be null");
+        }
+
+        User user = userRepository.findById(userId)
+                .filter(u -> !Boolean.TRUE.equals(u.getDeleted())) // soft delete check
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        return userMapper.toResponse(user);
     }
 
     @Override

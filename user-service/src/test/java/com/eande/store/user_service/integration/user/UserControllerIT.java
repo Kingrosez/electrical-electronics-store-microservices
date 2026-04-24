@@ -1,4 +1,4 @@
-package com.eande.store.user_service.controller;
+package com.eande.store.user_service.integration.user;
 
 import com.eande.store.user_service.dto.request.RegisterRequest;
 import com.eande.store.user_service.util.RegisterRequestBuilder;
@@ -15,9 +15,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -219,5 +221,125 @@ class UserControllerIT {
                 Arguments.of("", "Password is required"),
                 Arguments.of("abc", "Password must be at least 8 characters")
         );
+    }
+
+    @Test
+    void registerUsersBulk_shouldRegisterAllUsersSuccessfully() throws Exception {
+        RegisterRequest firstRequest = RegisterRequestBuilder.builder()
+                .withEmail("bulk-success-one@gmail.com")
+                .withPhone("1111111111")
+                .build();
+        RegisterRequest secondRequest = RegisterRequestBuilder.builder()
+                .withEmail("bulk-success-two@gmail.com")
+                .withPhone("2222222222")
+                .build();
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(firstRequest, secondRequest))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalProcessed").value(2))
+                .andExpect(jsonPath("$.successfulRegistrations").value(2))
+                .andExpect(jsonPath("$.failedRegistrations").value(0))
+                .andExpect(jsonPath("$.successDetails", hasSize(2)))
+                .andExpect(jsonPath("$.successDetails[0].email").value(firstRequest.email()))
+                .andExpect(jsonPath("$.successDetails[1].email").value(secondRequest.email()))
+                .andExpect(jsonPath("$.failureDetails", hasSize(0)));
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturnMixedResult_whenSomeUsersAlreadyExist() throws Exception {
+        RegisterRequest existingRequest = RegisterRequestBuilder.builder()
+                .withEmail("existing-bulk@gmail.com")
+                .withPhone("3333333333")
+                .build();
+        RegisterRequest duplicateEmailRequest = RegisterRequestBuilder.builder()
+                .withEmail(existingRequest.email())
+                .withPhone("4444444444")
+                .build();
+        RegisterRequest validRequest = RegisterRequestBuilder.builder()
+                .withEmail("fresh-bulk@gmail.com")
+                .withPhone("5555555555")
+                .build();
+
+        mockMvc.perform(post("/api/v1/users/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(existingRequest)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(duplicateEmailRequest, validRequest))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalProcessed").value(2))
+                .andExpect(jsonPath("$.successfulRegistrations").value(1))
+                .andExpect(jsonPath("$.failedRegistrations").value(1))
+                .andExpect(jsonPath("$.successDetails", hasSize(1)))
+                .andExpect(jsonPath("$.successDetails[0].email").value(validRequest.email()))
+                .andExpect(jsonPath("$.failureDetails", hasSize(1)))
+                .andExpect(jsonPath("$.failureDetails[0].request.email").value(duplicateEmailRequest.email()))
+                .andExpect(jsonPath("$.failureDetails[0].errorMessage").value("Email already in use"));
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturnMixedResult_whenDuplicatePhoneExists() throws Exception {
+        RegisterRequest existingRequest = RegisterRequestBuilder.builder()
+                .withEmail("existing-phone@gmail.com")
+                .withPhone("6666666666")
+                .build();
+        RegisterRequest duplicatePhoneRequest = RegisterRequestBuilder.builder()
+                .withEmail("duplicate-phone@gmail.com")
+                .withPhone(existingRequest.phone())
+                .build();
+        RegisterRequest validRequest = RegisterRequestBuilder.builder()
+                .withEmail("bulk-phone-valid@gmail.com")
+                .withPhone("7777777777")
+                .build();
+
+        mockMvc.perform(post("/api/v1/users/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(existingRequest)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(duplicatePhoneRequest, validRequest))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalProcessed").value(2))
+                .andExpect(jsonPath("$.successfulRegistrations").value(1))
+                .andExpect(jsonPath("$.failedRegistrations").value(1))
+                .andExpect(jsonPath("$.failureDetails[0].request.email").value(duplicatePhoneRequest.email()))
+                .andExpect(jsonPath("$.failureDetails[0].errorMessage").value("Phone number already in use"));
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturn400_whenAnyUserIsInvalid() throws Exception {
+        RegisterRequest validRequest = RegisterRequestBuilder.builder()
+                .withEmail("valid-bulk@gmail.com")
+                .withPhone("8888888888")
+                .build();
+        RegisterRequest invalidRequest = RegisterRequestBuilder.builder()
+                .withEmail("invalid-email")
+                .build();
+
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(List.of(validRequest, invalidRequest))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Validation Failed"))
+                .andExpect(jsonPath("$.fieldErrors").isArray());
+    }
+
+    @Test
+    void registerUsersBulk_shouldReturnEmptySummary_whenRequestListIsEmpty() throws Exception {
+        mockMvc.perform(post("/api/v1/users/bulk-register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalProcessed").value(0))
+                .andExpect(jsonPath("$.successfulRegistrations").value(0))
+                .andExpect(jsonPath("$.failedRegistrations").value(0))
+                .andExpect(jsonPath("$.successDetails", hasSize(0)))
+                .andExpect(jsonPath("$.failureDetails", hasSize(0)));
     }
 }

@@ -2,6 +2,7 @@ package com.eande.store.user_service.service;
 import com.eande.store.user_service.dto.request.*;
 import com.eande.store.user_service.dto.response.AddressResponse;
 import com.eande.store.user_service.dto.response.AuthResponse;
+import com.eande.store.user_service.dto.response.BulkRegistrationResponse;
 import com.eande.store.user_service.dto.response.UserResponse;
 import com.eande.store.user_service.enums.Role;
 import com.eande.store.user_service.enums.Status;
@@ -18,7 +19,7 @@ public interface UserService {
 
         UserResponse registerUser(RegisterRequest request);
 
-        List<UserResponse> registerUsersBulk(List<RegisterRequest> requests);
+        BulkRegistrationResponse registerUsersBulk(List<RegisterRequest> requests);
 
         AuthResponse login(LoginRequest request);
 
