@@ -1,41 +1,162 @@
-$path='.github/workflows/qodana_code_quality.yml'; $i=0; Get-Content $path | ForEach-Object { $i++; "${i}: $_" }
-1: #-------------------------------------------------------------------------------#
-2: #            Discover all capabilities of Qodana in our documentation           #
-3: #             https://www.jetbrains.com/help/qodana/about-qodana.html           #
-4: #-------------------------------------------------------------------------------#
-5: 
-6: name: Qodana
-7: on:
-8:   workflow_dispatch:
-9:   pull_request:
-10:   push:
-11:     branches:
-12:       - main
-13:       - user-service
-14: 
-15: jobs:
-16:   qodana:
-17:     runs-on: ubuntu-latest
-18:     permissions:
-19:       contents: write
-20:       pull-requests: write
-21:       checks: write
-22:     steps:
-23:       - uses: actions/checkout@v4
-24:         with:
-25:           ref: ${{ github.event.pull_request.head.sha }}
-26:           fetch-depth: 0
-27:       - name: 'Qodana Scan'
-28:         uses: JetBrains/qodana-action@v2026.1
-29:         env:
-30:           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
-31:         with:
-32:           # When pr-mode is set to true, Qodana analyzes only the files that have been changed
-33:           pr-mode: false
-34:           use-caches: true
-35:           post-pr-comment: true
-36:           use-annotations: true
-37:           # Upload Qodana results (SARIF, other artifacts, logs) as an artifact to the job
-38:           upload-result: false
-39:           # quick-fixes available in Ultimate and Ultimate Plus plans
-40:           push-fixes: 'none'
+
+name: Build and Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+      - auth-service
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: auth_db
+          POSTGRES_USER: auth_user
+          POSTGRES_PASSWORD: auth_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: Build and run tests with coverage
+        run: mvn clean verify
+
+      - name: Run JaCoCo report
+        run: mvn jacoco:report
+
+      - name: Check coverage thresholds
+        run: mvn jacoco:check
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports/
+          retention-days: 30
+
+      - name: SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        if: env.SONAR_TOKEN != null
+        run: mvn sonar:sonar -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          docker build -t auth-service:${{ github.sha }} .
+          docker tag auth-service:${{ github.sha }} auth-service:latest
+
+      - name: Save Docker image
+        run: docker save auth-service:${{ github.sha }} -o auth-service.tar
+
+      - name: Upload Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-service-image
+          path: auth-service.tar
+          retention-days: 7
+
+  qodana:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Qodana Scan
+        uses: JetBrains/qodana-action@v2024.3
+        env:
+          QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
+        with:
+          pr-mode: false
+          use-caches: true
+          post-pr-comment: true
+          use-annotations: true
+          upload-result: false
+          push-fixes: none
+
+  dependency-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Run OWASP Dependency Check
+        run: mvn org.owasp:dependency-check-maven:check
+
+      - name: Upload Dependency Check report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: target/dependency-check-report.html
+          retention-days: 30
