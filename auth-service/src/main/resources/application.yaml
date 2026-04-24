@@ -2,29 +2,41 @@ spring:
   application:
     name: auth-service
   profiles:
-    active: dev
+    active: dev  # Default profile, overridden by SPRING_PROFILES_ACTIVE
 
-# Logging Configuration
-logging:
-  file:
-    path: logs
-    name: ${logging.file.path}/${spring.application.name}.log
-  pattern:
-    console: "%d{ISO8601} | %highlight(%-5level) | [%thread] | %cyan(%logger{36}) | %msg%n"
-    file: "%d{ISO8601} | %-5level | [%thread] | %logger{36} | %msg%n"
-  level:
-    root: INFO
-    com.eande.store.auth_service: DEBUG
-
-# Server configuration
+# Common configuration across all profiles
 server:
   error:
     include-message: always
     include-binding-errors: always
+  shutdown: graceful
 
 springdoc:
   api-docs:
     path: /api-docs
+    enabled: true
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
+    tags-sorter: alpha
+    doc-expansion: none
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  info:
+    env:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
